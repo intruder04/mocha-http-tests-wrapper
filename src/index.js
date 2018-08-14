@@ -29,21 +29,21 @@ class Test {
 
     // mocha test method
     makeRequest(data: Object, paramsArg: WrapperArgsType) {
-        const descr: string = data.descr || '';
-        const method: string = data.method || 'post';
-        const status: number = data.status || 200;
-        const testDescr: string = `#${this.id} ${method.toUpperCase()}: ${data.url} ${status} ${descr}`;
-        const set: string = data.set || ['token', ''];
-        const auth: Object = data.auth || { login: "", pass: "" };
+        let url = data.setUrl;
+        const setDescr: string = data.setDescr || '';
+        const setMethod: string = data.setMethod || 'post';
+        const setHeader: string = data.setHeader || { };
+        const setAuth: Object = data.setAuth || { login: "", pass: "" };
         const shouldBeEmpty: boolean = data.shouldBeEmpty || false;
+        const shouldBeStatus: number = data.shouldBeStatus || 200;
         const shouldBeSchema: boolean = data.schema || false;
         const shouldBeUuid: boolean = data.shouldBeUuid || false;
         const shouldBeEqual: boolean = data.shouldBeEqual || false;
         const shouldBeHtml: boolean = data.shouldBeHtml || false;
         const shouldBeJwt: boolean = data.shouldBeJwt || false;
         const jwtShouldBeSignedWith: boolean = data.jwtShouldBeSignedWith || false;
+        const testDescr: string = `#${this.id} ${setMethod.toUpperCase()}: ${url} ${shouldBeStatus} ${setDescr}`;
         const params = paramsArg || {};
-        let { url } = data;
 
         const { saveResponse, constructCustomUrl } = params;
         
@@ -54,21 +54,20 @@ class Test {
             }
 
             chai
-            .request(this.server)
-            [method](url)
-            .set(set[0], set[1])
-            .auth(auth.login, auth.pass)
-            .send(data.body)
+            .request(this.server)[setMethod](url)
+            .set(setHeader)
+            .auth(setAuth.login, setAuth.pass)
+            .send(data.setBody)
             .end((err: Object, res: Object) => {
-                if (err != null && status === 200) {
+                if (err != null && shouldBeStatus === 200) {
                     done(err);
                     return;
                 }
                 try {
-                    res.should.have.status(status);
+                    res.should.have.status(shouldBeStatus);
                     res.should.not.be.empty();
 
-                    if (data.json || data.json == null) {
+                    if (data.shouldBeJson || data.shouldBeJson == null) {
                         res.should.be.json();
                     }
 
@@ -77,7 +76,7 @@ class Test {
                     }
 
                     if (shouldBeEmpty) {
-                        if (shouldBeEmpty.isArray) {
+                        if (Array.isArray(shouldBeEmpty)) {
                             for (let i = 0, len = shouldBeEmpty.length; i < len; i += 1) {
                                 this.variableFromString(res, shouldBeEmpty[i]).should.be.empty();
                             }
@@ -93,7 +92,7 @@ class Test {
                     }
 
                     if (shouldBeUuid) {
-                        if (shouldBeUuid.isArray) {
+                        if (Array.isArray(shouldBeUuid)) {
                             for (let i = 0, len = shouldBeUuid.length; i < len; i += 1) {
                                 expect(this.variableFromString(res, shouldBeUuid[i])).to.be.a.uuid();
                             }
@@ -109,7 +108,7 @@ class Test {
                     }
 
                     if (shouldBeJwt) {
-                        if (shouldBeJwt.isArray) {
+                        if (Array.isArray(shouldBeJwt)) {
                             for (let i = 0, len = shouldBeJwt.length; i < len; i += 1) {
                                 expect(this.variableFromString(res, shouldBeJwt[i])).to.be.a.jwt();
                             }
@@ -121,8 +120,6 @@ class Test {
 
                     if (jwtShouldBeSignedWith) {
                         Object.keys(jwtShouldBeSignedWith).forEach((key: number) => {
-                            console.log('key', jwtShouldBeSignedWith[key]);
-                            
                             expect(this.variableFromString(res, key)).to.be.signedWith(jwtShouldBeSignedWith[key]);
                         })
                     }

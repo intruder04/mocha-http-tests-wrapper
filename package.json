@@ -43,5 +43,5 @@
     "prettier": "prettier-eslint --write  \"./build/**/*.js\" --log-level \"silent\"",
     "test": "npm run build && mocha --timeout 15000 --exit ./test/test.js"
   },
-  "version": "1.0.5"
+  "version": "1.0.6"
 }

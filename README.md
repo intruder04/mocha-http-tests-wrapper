@@ -1,6 +1,6 @@
 # mocha-http-wrapper
 
-Module is used to make mocha tests in declarative way
+Module to make mocha tests in declarative way
 
 Example:  
 
@@ -8,15 +8,20 @@ Example:
 const Tests = new TestWrapper(server);
 
 Tests.makeRequest({
-    descr: 'test!',
-    status: 200,
-    url: '/api/create/',
-    body: {thisIsBody: 'test'},
+    setDescr: 'Testing wrapper',
+    setHeader: { 'token': '123', 'ETag': '123442' },
+    setUrl: '/hello',
+    setMethod: 'get',
+    setAuth: { 'login': '', 'pass': '' },
+    setBody: 'Hello World!',
+    shouldBeStatus: 200,
+    shouldBeJson: false,
+    shouldBeJwt: 'body.data.message',
+    shouldBeEmpty: ['body.data.empty'],
+    shouldBeEqual: { 'body.data.equal': 777, 'body.data.equal2': 'to be equal' },
+    jwtShouldBeSignedWith: { 'body.data.message': '123' }
     shouldBeSchema: { 'body': schema },
     shouldBeUuid: ['body.data.message'], // string or array of strings
-    shouldBeEqual: { 'body.status': 'DECLINE' },
-    shouldBeJwt: 'body.data.message', // string or array of strings
-    jwtShouldBeSignedWith: { 'body.data.message': '123' }
   });
 ```
 
