@@ -31,113 +31,161 @@ class Test {
     makeRequest(data: Object, paramsArg: WrapperArgsType) {
         let url = data.setUrl;
         const setDescr: string = data.setDescr || '';
-        const setMethod: string = data.setMethod || 'post';
-        const setHeader: string = data.setHeader || { };
-        const setAuth: Object = data.setAuth || { login: "", pass: "" };
-        const shouldBeEmpty: boolean = data.shouldBeEmpty || false;
         const shouldBeStatus: number = data.shouldBeStatus || 200;
-        const shouldBeSchema: boolean = data.schema || false;
-        const shouldBeUuid: boolean = data.shouldBeUuid || false;
-        const shouldBeEqual: boolean = data.shouldBeEqual || false;
-        const shouldBeHtml: boolean = data.shouldBeHtml || false;
-        const shouldBeJwt: boolean = data.shouldBeJwt || false;
-        const jwtShouldBeSignedWith: boolean = data.jwtShouldBeSignedWith || false;
+        const setMethod: string = data.setMethod || 'post';
         const testDescr: string = `#${this.id} ${setMethod.toUpperCase()}: ${url} ${shouldBeStatus} ${setDescr}`;
-        const params = paramsArg || {};
-
-        const { saveResponse, constructCustomUrl } = params;
         
         it(testDescr, (done: Object) => {
+
+            let inputData = data;
+
+            const prepareFunc = inputData.prepareRequest || false;
+            if (prepareFunc) {
+                // console.log('storage - ', this.storage.token);
+                const newData = prepareFunc(this.storage);
+                // console.log('newData', newData);
+                inputData = { ...inputData, ...newData };
+                // console.log('inputData', inputData);
+            }
+
+            const setHeader: string = inputData.setHeader || { };
+            const setAuth: Object = inputData.setAuth || false;
+            const setMaxRedirects: number = inputData.setMaxRedirects || false;
+
+            const shouldBeEmpty = inputData.shouldBeEmpty || false;
+            const shouldBeSchema = inputData.schema || false;
+            const shouldBeUuid = inputData.shouldBeUuid || false;
+            const shouldBeEqual = inputData.shouldBeEqual || false;
+            const shouldBeFormat = inputData.shouldBeFormat || false;
+            const shouldBeJwt: boolean = inputData.shouldBeJwt || false;
+            const jwtShouldBeSignedWith: boolean = inputData.jwtShouldBeSignedWith || false;
+            
+            const saveStorage: boolean = inputData.saveStorage || false;
+            const params = paramsArg || {};
+
+            const { saveResponse, constructCustomUrl } = params;
 
             if (constructCustomUrl) {
                 url = this.createCustomUrl(constructCustomUrl);
             }
 
-            chai
-            .request(this.server)[setMethod](url)
-            .set(setHeader)
-            .auth(setAuth.login, setAuth.pass)
-            .send(data.setBody)
-            .end((err: Object, res: Object) => {
-                if (err != null && shouldBeStatus === 200) {
-                    done(err);
-                    return;
-                }
-                try {
-                    res.should.have.status(shouldBeStatus);
-                    res.should.not.be.empty();
+            let chaiObj = chai;
 
-                    if (data.shouldBeJson || data.shouldBeJson == null) {
-                        res.should.be.json();
+            chaiObj = chaiObj
+                .request(this.server)[setMethod](url)
+
+            // add auth 
+            if (setAuth) {
+                chaiObj = chaiObj
+                    .auth(setAuth.login, setAuth.pass);
+            }
+
+            // add redirects
+            if (setMaxRedirects) {
+                chaiObj = chaiObj
+                    .redirects(setMaxRedirects);
+            }
+
+            // add everything else
+            chaiObj
+                .set(setHeader)
+                .send(inputData.setBody)
+                .end((err: Object, res: Object) => {
+                    if (err != null && shouldBeStatus === 200) {
+                        done(err);
+                        return;
                     }
+                    try {                        
 
-                    if (shouldBeHtml) {
-                        res.should.be.html();
-                    }
+                        res.should.have.status(shouldBeStatus);
+                        res.should.not.be.empty();
 
-                    if (shouldBeEmpty) {
-                        if (Array.isArray(shouldBeEmpty)) {
-                            for (let i = 0, len = shouldBeEmpty.length; i < len; i += 1) {
-                                this.variableFromString(res, shouldBeEmpty[i]).should.be.empty();
+                        if (shouldBeFormat) {
+                            const resContentType = res.header['content-type'];
+
+                            if (shouldBeFormat === 'json') {
+                                res.should.be.json();
+                            } else if (shouldBeFormat === 'html') {
+                                res.should.be.html();
+                            } else if (shouldBeFormat === 'plain') {
+                                expect(resContentType).to.include(shouldBeFormat);
+                            } else {
+                                throw new Error('Wrong format for shouldBeFormat (html, json, plain)');
                             }
                         } else {
-                            this.variableFromString(res, shouldBeEmpty).should.be.empty();
+                            res.should.be.json();
                         }
-                    }
 
-                    if (shouldBeSchema) {
-                        Object.keys(shouldBeSchema).forEach((key: number) => {
-                            expect(this.variableFromString(res, key)).to.be.jsonSchema(shouldBeSchema[key]);
-                        })
-                    }
-
-                    if (shouldBeUuid) {
-                        if (Array.isArray(shouldBeUuid)) {
-                            for (let i = 0, len = shouldBeUuid.length; i < len; i += 1) {
-                                expect(this.variableFromString(res, shouldBeUuid[i])).to.be.a.uuid();
+                        if (shouldBeEmpty) {
+                            if (Array.isArray(shouldBeEmpty)) {
+                                for (let i = 0, len = shouldBeEmpty.length; i < len; i += 1) {
+                                    this.variableFromString(res, shouldBeEmpty[i]).should.be.empty();
+                                }
+                            } else {
+                                this.variableFromString(res, shouldBeEmpty).should.be.empty();
                             }
-                        } else {
-                            expect(this.variableFromString(res, shouldBeUuid)).to.be.a.uuid();
                         }
-                    }
 
-                    if (shouldBeEqual) {
-                        Object.keys(shouldBeEqual).forEach((key: number) => {
-                            expect(this.variableFromString(res, key)).to.be.equal(shouldBeEqual[key]);
-                        })
-                    }
+                        if (shouldBeSchema) {
+                            Object.keys(shouldBeSchema).forEach((key: number) => {
+                                expect(this.variableFromString(res, key)).to.be.jsonSchema(shouldBeSchema[key]);
+                            })
+                        }
 
-                    if (shouldBeJwt) {
-                        if (Array.isArray(shouldBeJwt)) {
-                            for (let i = 0, len = shouldBeJwt.length; i < len; i += 1) {
-                                expect(this.variableFromString(res, shouldBeJwt[i])).to.be.a.jwt();
+                        if (shouldBeUuid) {
+                            if (Array.isArray(shouldBeUuid)) {
+                                for (let i = 0, len = shouldBeUuid.length; i < len; i += 1) {
+                                    expect(this.variableFromString(res, shouldBeUuid[i])).to.be.a.uuid();
+                                }
+                            } else {
+                                expect(this.variableFromString(res, shouldBeUuid)).to.be.a.uuid();
                             }
-                        } else {
-                            expect(this.variableFromString(res, shouldBeJwt)).to.be.a.jwt();
                         }
-                       
-                    }
 
-                    if (jwtShouldBeSignedWith) {
-                        Object.keys(jwtShouldBeSignedWith).forEach((key: number) => {
-                            expect(this.variableFromString(res, key)).to.be.signedWith(jwtShouldBeSignedWith[key]);
-                        })
-                    }
+                        if (shouldBeEqual) {
+                            Object.keys(shouldBeEqual).forEach((key: number) => {
+                                expect(this.variableFromString(res, key)).to.be.equal(shouldBeEqual[key]);
+                            })
+                        }
 
-                    if (data.customAssert) {
-                        data.customAssert(res);
+                        if (shouldBeJwt) {
+                            if (Array.isArray(shouldBeJwt)) {
+                                for (let i = 0, len = shouldBeJwt.length; i < len; i += 1) {
+                                    expect(this.variableFromString(res, shouldBeJwt[i])).to.be.a.jwt();
+                                }
+                            } else {
+                                expect(this.variableFromString(res, shouldBeJwt)).to.be.a.jwt();
+                            }
+                        
+                        }
+
+                        if (jwtShouldBeSignedWith) {
+                            Object.keys(jwtShouldBeSignedWith).forEach((key: number) => {
+                                expect(this.variableFromString(res, key)).to.be.signedWith(jwtShouldBeSignedWith[key]);
+                            })
+                        }
+
+                        if (inputData.customAssert) {
+                            inputData.customAssert(res);
+                        }
+                        
+                        if (res.body && saveResponse) {
+                            this.setStorage(res);
+                        }
+
+                        
+                        if (saveStorage) {
+                            saveStorage(res, this.storage);
+                            // console.log('this.storage', this.storage);
+                        }
+
+                        done();
+                        
+                    } catch (error) {
+                        // console.log(JSON.stringify(res.body, null, 2));
+                        done(error);
                     }
-                    
-                    if (res.body && saveResponse) {
-                        this.setStorage(res);
-                    }
-                    done();
-                    
-                } catch (error) {
-                    // console.log(JSON.stringify(res.body, null, 2));
-                    done(error);
-                }
-            });
+                });
         });
         this.id += 1;
     }
@@ -153,6 +201,9 @@ class Test {
         let target = res;
         for(let i=0,len=props.length; i<len; i += 1) {
             target = target[props[i]];
+            if ( typeof target === 'undefined' ) {
+                throw new Error(`Test failed! ${stringArg} is undefined in response!`);
+            }
         }
         return target;
     }

@@ -14,14 +14,23 @@ Tests.makeRequest({
     setMethod: 'get',
     setAuth: { 'login': '', 'pass': '' },
     setBody: 'Hello World!',
+    setMaxRedirects: 0,
     shouldBeStatus: 200,
-    shouldBeJson: false,
+    shouldBeFormat: 'json', // json or html or plain
     shouldBeJwt: 'body.data.message',
     shouldBeEmpty: ['body.data.empty'],
     shouldBeEqual: { 'body.data.equal': 777, 'body.data.equal2': 'to be equal' },
     jwtShouldBeSignedWith: { 'body.data.message': '123' }
     shouldBeSchema: { 'body': schema },
     shouldBeUuid: ['body.data.message'], // string or array of strings
+    saveStorage: (res, storage) => {
+      storage.blabla = 'blabla';
+      storage.token = res.body.data.equal;
+    },
+    prepareRequest: storage => ({
+      setHeader: { 'token': storage.token },
+      setBody: 'Hello World 22222!'
+    })
   });
 ```
 
