@@ -42,10 +42,10 @@
   },
   "license": "UNLICENSED",
   "main": "./build/index.js",
-  "name": "@AcmeCryptoScope/mocha-http-wrapper",
+  "name": "mocha-http-wrapper",
   "repository": {
     "type": "git",
-    "url": "http://git.office/viktorm/mocha-http-wrapper"
+    "url": "https://github.com/intruder04/mocha-http-tests-wrapper"
   },
   "scripts": {
     "build": "./build.sh",
