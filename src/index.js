@@ -1,6 +1,7 @@
+// @flow
 /* eslint class-methods-use-this: 0 */
-/* jshint expr: true */
-import type { $Application, $Response } from 'express';
+
+import type { $Response, $Application } from 'express';
 import type { WrapperArgsType, UrlParamType } from './types/tests.types';
 
 const chai = require('chai');
@@ -20,10 +21,18 @@ chai.use(chaiUUID);
 chai.use(chaiHttp);
 chai.use(chaiJWT);
 
+// to make allure attachements
+require('mocha-allure-reporter');
+
 class Test {
-    constructor(server: $Application) {
+
+    id: number;
+    serverApp: $Application;
+    storage: Object;
+
+    constructor(serverApp: $Object) {
         this.id = 1;
-        this.server = server;
+        this.serverApp = serverApp;
         this.storage = { };
     }
 
@@ -48,19 +57,20 @@ class Test {
                 // console.log('inputData', inputData);
             }
 
-            const setHeader: string = inputData.setHeader || { };
-            const setAuth: Object = inputData.setAuth || false;
-            const setMaxRedirects: number = inputData.setMaxRedirects || false;
+            const setHeader = inputData.setHeader || { };
 
-            const shouldBeEmpty = inputData.shouldBeEmpty || false;
-            const shouldBeSchema = inputData.schema || false;
-            const shouldBeUuid = inputData.shouldBeUuid || false;
-            const shouldBeEqual = inputData.shouldBeEqual || false;
-            const shouldBeFormat = inputData.shouldBeFormat || false;
-            const shouldBeJwt: boolean = inputData.shouldBeJwt || false;
-            const jwtShouldBeSignedWith: boolean = inputData.jwtShouldBeSignedWith || false;
+            const { setAuth,
+                    setMaxRedirects,
+                    shouldBeEmpty,
+                    shouldBeSchema,
+                    shouldBeUuid,
+                    shouldBeEqual,
+                    shouldBeFormat,
+                    shouldBeJwt,
+                    jwtShouldBeSignedWith,
+                    saveStorage
+                } = inputData;
             
-            const saveStorage: boolean = inputData.saveStorage || false;
             const params = paramsArg || {};
 
             const { saveResponse, constructCustomUrl } = params;
@@ -72,7 +82,7 @@ class Test {
             let chaiObj = chai;
 
             chaiObj = chaiObj
-                .request(this.server)[setMethod](url)
+                .request(this.serverApp)[setMethod](url)
 
             // add auth 
             if (setAuth) {
@@ -81,7 +91,7 @@ class Test {
             }
 
             // add redirects
-            if (setMaxRedirects) {
+            if (typeof setMaxRedirects !== 'undefined' && setMaxRedirects >= 0) {
                 chaiObj = chaiObj
                     .redirects(setMaxRedirects);
             }
@@ -96,7 +106,6 @@ class Test {
                         return;
                     }
                     try {                        
-
                         res.should.have.status(shouldBeStatus);
                         res.should.not.be.empty();
 
@@ -112,47 +121,45 @@ class Test {
                             } else {
                                 throw new Error('Wrong format for shouldBeFormat (html, json, plain)');
                             }
-                        } else {
-                            res.should.be.json();
                         }
 
                         if (shouldBeEmpty) {
                             if (Array.isArray(shouldBeEmpty)) {
-                                for (let i = 0, len = shouldBeEmpty.length; i < len; i += 1) {
-                                    this.variableFromString(res, shouldBeEmpty[i]).should.be.empty();
-                                }
+                                shouldBeEmpty.forEach((empty: string) => {
+                                    this.variableFromString(res, empty).should.be.empty();
+                                });
                             } else {
                                 this.variableFromString(res, shouldBeEmpty).should.be.empty();
                             }
                         }
 
                         if (shouldBeSchema) {
-                            Object.keys(shouldBeSchema).forEach((key: number) => {
+                            Object.keys(shouldBeSchema).forEach((key: string) => {
                                 expect(this.variableFromString(res, key)).to.be.jsonSchema(shouldBeSchema[key]);
                             })
                         }
 
                         if (shouldBeUuid) {
                             if (Array.isArray(shouldBeUuid)) {
-                                for (let i = 0, len = shouldBeUuid.length; i < len; i += 1) {
-                                    expect(this.variableFromString(res, shouldBeUuid[i])).to.be.a.uuid();
-                                }
+                                shouldBeUuid.forEach((element: string) => {
+                                    expect(this.variableFromString(res, element)).to.be.a.uuid();
+                                });
                             } else {
                                 expect(this.variableFromString(res, shouldBeUuid)).to.be.a.uuid();
                             }
                         }
 
                         if (shouldBeEqual) {
-                            Object.keys(shouldBeEqual).forEach((key: number) => {
+                            Object.keys(shouldBeEqual).forEach((key: string) => {
                                 expect(this.variableFromString(res, key)).to.be.equal(shouldBeEqual[key]);
                             })
                         }
 
                         if (shouldBeJwt) {
                             if (Array.isArray(shouldBeJwt)) {
-                                for (let i = 0, len = shouldBeJwt.length; i < len; i += 1) {
-                                    expect(this.variableFromString(res, shouldBeJwt[i])).to.be.a.jwt();
-                                }
+                                shouldBeJwt.forEach((element: string) => {
+                                    expect(this.variableFromString(res, element)).to.be.a.jwt();
+                                });
                             } else {
                                 expect(this.variableFromString(res, shouldBeJwt)).to.be.a.jwt();
                             }
@@ -160,7 +167,7 @@ class Test {
                         }
 
                         if (jwtShouldBeSignedWith) {
-                            Object.keys(jwtShouldBeSignedWith).forEach((key: number) => {
+                            Object.keys(jwtShouldBeSignedWith).forEach((key: string) => {
                                 expect(this.variableFromString(res, key)).to.be.signedWith(jwtShouldBeSignedWith[key]);
                             })
                         }
@@ -181,9 +188,13 @@ class Test {
 
                         done();
                         
-                    } catch (error) {
-                        // console.log(JSON.stringify(res.body, null, 2));
-                        done(error);
+                    } catch (err2) {
+                        // write allure attachements if allure object is populated (allure reporter applied)
+                        if (allure._allure.suites.length > 0) {
+                            allure.createAttachment('Request to serverApp ', JSON.stringify(chaiObj), 'application/json');
+                            allure.createAttachment('serverApp response: ', JSON.stringify(res), 'application/json');
+                        }
+                        done(err2);
                     }
                 });
         });
@@ -196,15 +207,15 @@ class Test {
     }
 
     // attach dot notation string to object to create a variable (target)
-    variableFromString(res: $Response, stringArg: string): Object {
+    variableFromString(res: $Response, stringArg: string): any {
         const props = stringArg.split('.');
         let target = res;
-        for(let i=0,len=props.length; i<len; i += 1) {
-            target = target[props[i]];
-            if ( typeof target === 'undefined' ) {
-                throw new Error(`Test failed! ${stringArg} is undefined in response!`);
+        props.forEach((prop: string) => {            
+            target = target[prop];
+            if (typeof target === 'undefined') {
+                throw new TypeError(`Test failed! ${stringArg} is undefined in response!`);
             }
-        }
+        });
         return target;
     }
 
